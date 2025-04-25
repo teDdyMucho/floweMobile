@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useVIPStore } from '@/store/vip-store';
+import { useSettingsStore } from '@/store/settings-store';
 import { Button } from '@/components/ui/button';
-import { Crown, Users, Plus, Trash2, Copy, Check, SendHorizonal, User } from 'lucide-react';
+import { Crown, Users, Copy, Check, SendHorizonal, User, Info } from 'lucide-react';
 import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuthStore } from '@/store/auth-store';
@@ -41,6 +42,9 @@ export function VIPPanel() {
   const [recipientIdentifier, setRecipientIdentifier] = useState('');
   const [transferAmount, setTransferAmount] = useState('');
   const [transferError, setTransferError] = useState('');
+  
+  // Get global settings for direct transfers
+  const { allowDirectTransfers } = useSettingsStore();
 
   useEffect(() => {
     if (!user?.id) return;
@@ -161,14 +165,24 @@ export function VIPPanel() {
       return;
     }
     
-    if (!confirm(`Request to transfer ${amount} points to ${recipientIdentifier}?`)) {
+    const confirmMessage = allowDirectTransfers 
+      ? `Transfer ${amount} points to ${recipientIdentifier} immediately?` 
+      : `Request to transfer ${amount} points to ${recipientIdentifier}?`;
+    
+    if (!confirm(confirmMessage)) {
       return;
     }
     
     setIsProcessing(true);
     try {
-      await vipStore.transferPoints(user.id, recipientIdentifier, amount);
-      alert('Transfer request submitted! Please wait for admin approval.');
+      await vipStore.transferPoints(user.id, recipientIdentifier, amount, allowDirectTransfers);
+      
+      if (allowDirectTransfers) {
+        alert(`${amount} points successfully transferred to ${recipientIdentifier}!`);
+      } else {
+        alert('Transfer request submitted! Please wait for admin approval.');
+      }
+      
       setRecipientIdentifier('');
       setTransferAmount('');
     } catch (error) {
@@ -278,82 +292,92 @@ export function VIPPanel() {
         </div>
       )}
       
-      {/* Point Transfer Section - Only visible for VIP users */}
-      {vipData.vipLevel > 0 && (
-        <div className="rounded-lg bg-white p-6 shadow-md">
-          <h2 className="mb-4 text-xl font-bold flex items-center">
-            <SendHorizonal className="h-5 w-5 mr-2 text-green-500" />
-            Transfer Points
-          </h2>
-          
-          <div className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="recipient">Recipient Username or Referral Code</Label>
-              <div className="flex items-center space-x-2">
-                <User className="h-5 w-5 text-gray-400" />
-                <Input 
-                  id="recipient"
-                  placeholder="Enter username or referral code"
-                  value={recipientIdentifier}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRecipientIdentifier(e.target.value)}
-                  className="flex-1"
-                />
-              </div>
+      {/* Point Transfer Section - Now available to all users */}
+      <div className="rounded-lg bg-white p-6 shadow-md">
+        <h2 className="mb-4 text-xl font-bold flex items-center">
+          <SendHorizonal className="h-5 w-5 mr-2 text-green-500" />
+          Transfer Points
+        </h2>
+        
+        <div className="space-y-4">
+          <div className="grid gap-2">
+            <Label htmlFor="recipient">Recipient Username or Referral Code</Label>
+            <div className="flex items-center space-x-2">
+              <User className="h-5 w-5 text-gray-400" />
+              <Input 
+                id="recipient"
+                placeholder="Enter username or referral code"
+                value={recipientIdentifier}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRecipientIdentifier(e.target.value)}
+                className="flex-1"
+              />
             </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="amount">Amount</Label>
-              <div className="flex items-center space-x-2">
-                <Input 
-                  id="amount"
-                  type="number"
-                  placeholder="Enter amount to transfer"
-                  value={transferAmount}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTransferAmount(e.target.value)}
-                  min="1"
-                  max={user?.points.toString()}
-                  className="flex-1"
-                />
-                <span className="text-sm text-gray-500">
-                  Available: {user?.points || 0} points
-                </span>
-              </div>
-            </div>
-            
-            {transferError && (
-              <div className="text-sm text-red-500">{transferError}</div>
-            )}
-            
-            {/* Pending Transfer Requests */}
-            {transferRequests.length > 0 && (
-              <div className="mt-4 rounded-lg bg-blue-50 p-4">
-                <h3 className="font-medium text-blue-800 mb-2">Pending Transfer Requests</h3>
-                <div className="space-y-2">
-                  {transferRequests.map(request => (
-                    <div key={request.id} className="text-sm text-blue-700 flex justify-between">
-                      <span>
-                        {request.amount} points to {request.recipientUsername}
-                      </span>
-                      <span className="text-blue-500 text-xs">
-                        {new Date(request.timestamp).toLocaleDateString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            <Button
-              onClick={handleTransferPoints}
-              disabled={isProcessing}
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600"
-            >
-              <SendHorizonal className="mr-2 h-4 w-4" />
-              Request Point Transfer
-            </Button>
           </div>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="amount">Amount</Label>
+            <div className="flex items-center space-x-2">
+              <Input 
+                id="amount"
+                type="number"
+                placeholder="Enter amount to transfer"
+                value={transferAmount}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTransferAmount(e.target.value)}
+                min="1"
+                max={user?.points.toString()}
+                className="flex-1"
+              />
+              <span className="text-sm text-gray-500">
+                Available: {user?.points || 0} points
+              </span>
+            </div>
+          </div>
+          
+          {/* Direct Transfer Status */}
+          <div className="flex items-center py-2 bg-gray-50 rounded-md px-3">
+            <Info className="h-5 w-5 text-blue-500 mr-2" />
+            <div>
+              {allowDirectTransfers ? (
+                <p className="text-sm text-green-700">Direct transfers are enabled. Your transfer will be processed immediately.</p>
+              ) : (
+                <p className="text-sm text-gray-700">Direct transfers are disabled. Your transfer will require admin approval.</p>
+              )}
+            </div>
+          </div>
+          
+          {transferError && (
+            <div className="text-sm text-red-500">{transferError}</div>
+          )}
+          
+          {/* Pending Transfer Requests */}
+          {transferRequests.length > 0 && (
+            <div className="mt-4 rounded-lg bg-blue-50 p-4">
+              <h3 className="font-medium text-blue-800 mb-2">Pending Transfer Requests</h3>
+              <div className="space-y-2">
+                {transferRequests.map(request => (
+                  <div key={request.id} className="text-sm text-blue-700 flex justify-between">
+                    <span>
+                      {request.amount} points to {request.recipientUsername}
+                    </span>
+                    <span className="text-blue-500 text-xs">
+                      {new Date(request.timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <Button
+            onClick={handleTransferPoints}
+            disabled={isProcessing}
+            className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600"
+          >
+            <SendHorizonal className="mr-2 h-4 w-4" />
+            {allowDirectTransfers ? 'Transfer Points Now' : 'Request Point Transfer'}
+          </Button>
         </div>
-      )}
+      </div>
 
       {/* VIP Levels */}
       <div className="space-y-6">

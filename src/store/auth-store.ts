@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { generateReferralCode } from '@/lib/utils';
+import { useSettingsStore } from './settings-store';
 
 interface User {
   id: string;
@@ -85,7 +86,13 @@ export const useAuthStore = create<AuthState>()(
             };
 
             // Only add points/cash update methods for admin users
-            const state: AuthState = { user, loading: false };
+            const state: AuthState = { 
+              user, 
+              loading: false,
+              login: get().login,
+              register: get().register,
+              logout: get().logout
+            };
             if (userData.isAdmin) {
               state.updatePoints = async (userId: string, amount: number) => {
                 const userRef = doc(db, 'users', userId);
@@ -186,6 +193,9 @@ export const useAuthStore = create<AuthState>()(
             throw new Error("Username already taken");
           }
 
+          // Check if auto-approve is enabled
+          const { autoApproveUsers } = useSettingsStore.getState();
+          
           const newUserData = {
             username,
             password,
@@ -194,7 +204,7 @@ export const useAuthStore = create<AuthState>()(
             points: 0,
             cash: 0,
             isAdmin: false,
-            approved: false,
+            approved: autoApproveUsers, // Auto-approve if setting is enabled
             gcashNumber: gcashNumber || null,
             createdAt: new Date(),
             lastLoginAt: new Date()
@@ -206,8 +216,9 @@ export const useAuthStore = create<AuthState>()(
             
             if (!refSnapshot.empty) {
               // Store referrer info but don't award points yet
-              newUserData.referrerId = refSnapshot.docs[0].id;
-              newUserData.referralPending = true;
+              // Use type assertion to add these properties
+              (newUserData as any).referrerId = refSnapshot.docs[0].id;
+              (newUserData as any).referralPending = true;
             } else {
               throw new Error("Invalid referral code");
             }
@@ -237,6 +248,4 @@ export const useAuthStore = create<AuthState>()(
   )
 );
 
-function useState(arg0: string): [any, any] {
-  throw new Error('Function not implemented.');
-}
+// Unused function removed

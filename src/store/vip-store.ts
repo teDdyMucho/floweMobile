@@ -30,7 +30,7 @@ export interface VIPState {
   };
   initializeVIP: (userId: string) => Promise<void>;
   requestUpgrade: (userId: string, targetLevel: number) => Promise<void>;
-  transferPoints: (userId: string, recipientIdentifier: string, amount: number) => Promise<void>;
+  transferPoints: (userId: string, recipientIdentifier: string, amount: number, directTransfer?: boolean) => Promise<void>;
 }
 
 export const DEFAULT_VIP_DATA = {
@@ -142,7 +142,7 @@ export const useVIPStore = create<VIPState>()(
           throw error;
         }
       },
-      transferPoints: async (userId: string, recipientIdentifier: string, amount: number) => {
+      transferPoints: async (userId: string, recipientIdentifier: string, amount: number, directTransfer: boolean = false) => {
         try {
           // Validate input
           if (!userId) throw new Error('User ID is required');
@@ -159,10 +159,7 @@ export const useVIPStore = create<VIPState>()(
 
           const userData = userDoc.data();
           
-          // Check if user is VIP
-          if (!userData.vipLevel || userData.vipLevel < 1) {
-            throw new Error('Only VIP users can transfer points');
-          }
+          // No longer checking if user is VIP - all users can transfer points
 
           // Check if user has enough points
           if (userData.points < amount) {
@@ -195,17 +192,63 @@ export const useVIPStore = create<VIPState>()(
             throw new Error('Cannot transfer points to yourself');
           }
 
-          // Create a transfer request for admin approval
-          await addDoc(collection(db, 'requests'), {
-            userId,
-            username: userData.username,
-            type: 'point_transfer',
-            recipientId,
-            recipientUsername: recipientData.username,
-            amount,
-            status: 'pending',
-            timestamp: new Date(),
-          });
+          // If directTransfer is true, process the transfer immediately without admin approval
+          if (directTransfer) {
+            // Update sender's points (deduct)
+            const newSenderPoints = userData.points - amount;
+            await updateDoc(userRef, {
+              points: newSenderPoints
+            });
+            
+            // Update recipient's points (add)
+            const recipientRef = doc(db, 'users', recipientId);
+            const recipientPoints = recipientData.points || 0;
+            const newRecipientPoints = recipientPoints + amount;
+            await updateDoc(recipientRef, {
+              points: newRecipientPoints
+            });
+            
+            // Log sender transaction
+            await addDoc(collection(db, 'transactions'), {
+              userId,
+              username: userData.username,
+              amount: -amount,
+              type: 'point_transfer_out',
+              description: `Transferred ${amount} points to ${recipientData.username}`,
+              timestamp: new Date(),
+              balanceAfter: {
+                points: newSenderPoints,
+                cash: userData.cash || 0
+              }
+            });
+            
+            // Log recipient transaction
+            await addDoc(collection(db, 'transactions'), {
+              userId: recipientId,
+              username: recipientData.username,
+              amount: amount,
+              type: 'point_transfer_in',
+              description: `Received ${amount} points from ${userData.username}`,
+              timestamp: new Date(),
+              balanceAfter: {
+                points: newRecipientPoints,
+                cash: recipientData.cash || 0
+              }
+            });
+          } else {
+            // Create a transfer request for admin approval
+            await addDoc(collection(db, 'requests'), {
+              userId,
+              username: userData.username,
+              type: 'point_transfer',
+              recipientId,
+              recipientUsername: recipientData.username,
+              amount,
+              status: 'pending',
+              timestamp: new Date(),
+              directTransfer: directTransfer
+            });
+          }
 
           return;
         } catch (error) {

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Crown, Plus, Trash2, Search, X, ChevronDown, ChevronUp, RefreshCw, SendHorizonal } from 'lucide-react';
+import { Crown, Plus, Trash2, Search, X, ChevronDown, ChevronUp, RefreshCw, SendHorizonal, ToggleLeft, ToggleRight } from 'lucide-react';
 import { doc, collection, query, where, updateDoc, onSnapshot, getDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import * as Dialog from '@radix-ui/react-dialog';
 import { DEFAULT_VIP_DATA } from '@/store/vip-store';
 import { processUpgradeRequest } from '@/services/vipService';
+import { useSettingsStore } from '@/store/settings-store';
 
 interface Props {
   setError: (error: string) => void;
@@ -61,6 +62,7 @@ interface PointTransferRequest {
   amount: number;
   status: 'pending' | 'approved' | 'declined';
   timestamp: Date;
+  directTransfer?: boolean;
 }
 
 export function VIPAdmin({ setError, setMessage }: Props) {
@@ -75,8 +77,15 @@ export function VIPAdmin({ setError, setMessage }: Props) {
   const [newSlotName, setNewSlotName] = useState('');
   const [isResetting, setIsResetting] = useState(false);
   const [isProcessingTransfer, setIsProcessingTransfer] = useState(false);
+  
+  // Settings store for global direct transfer toggle
+  const settingsStore = useSettingsStore();
+  const { allowDirectTransfers, setAllowDirectTransfers, initializeSettings } = settingsStore;
 
   useEffect(() => {
+    // Initialize global settings
+    initializeSettings();
+    
     // Listen to VIP users.
     const vipQuery = query(
       collection(db, 'users'),
@@ -353,6 +362,42 @@ export function VIPAdmin({ setError, setMessage }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* Global Settings Toggle */}
+      <div className="rounded-lg bg-white p-6 shadow-lg">
+        <h2 className="mb-4 text-lg font-semibold">Global Settings</h2>
+        
+        <div className="flex items-center justify-between py-2 border-b border-gray-100 mb-2">
+          <div>
+            <h3 className="font-medium">Allow Direct Point Transfers</h3>
+            <p className="text-sm text-gray-600">When enabled, users can transfer points without admin approval</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAllowDirectTransfers(!allowDirectTransfers)}
+            className="focus:outline-none"
+          >
+            {allowDirectTransfers ? (
+              <ToggleRight className="h-8 w-8 text-green-500" />
+            ) : (
+              <ToggleLeft className="h-8 w-8 text-gray-400" />
+            )}
+          </button>
+        </div>
+        
+        <div className="text-sm text-gray-500">
+          {allowDirectTransfers ? (
+            <div className="flex items-center text-green-600">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-2"></span>
+              Direct transfers are currently enabled
+            </div>
+          ) : (
+            <div className="flex items-center text-gray-600">
+              <span className="inline-block w-2 h-2 rounded-full bg-gray-400 mr-2"></span>
+              Direct transfers are currently disabled
+            </div>
+          )}
+        </div>
+      </div>
       {/* Point Transfer Requests */}
       {transferRequests.length > 0 && (
         <div className="rounded-lg bg-white p-6 shadow-lg">
@@ -368,7 +413,14 @@ export function VIPAdmin({ setError, setMessage }: Props) {
                   <p className="text-sm text-gray-600">
                     Requesting to transfer {request.amount} points to {request.recipientUsername}
                   </p>
-                  <p className="text-xs text-gray-500">{request.timestamp.toLocaleString()}</p>
+                  <div className="flex items-center mt-1">
+                    <p className="text-xs text-gray-500 mr-2">{request.timestamp.toLocaleString()}</p>
+                    {request.directTransfer && (
+                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
+                        Admin Bypass Enabled
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex space-x-2">
                   <Button

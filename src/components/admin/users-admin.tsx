@@ -3,7 +3,8 @@ import { collection, query, where, onSnapshot, doc, updateDoc, getDoc, getDocs, 
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check, X, User, Users, CircleDollarSign, DollarSign, AlertCircle, Trash2, Ban, MessageSquare, Search } from 'lucide-react';
+import { Check, X, User, Users, CircleDollarSign, DollarSign, AlertCircle, Trash2, Ban, MessageSquare, Search, ToggleLeft, ToggleRight } from 'lucide-react';
+import { useSettingsStore } from '@/store/settings-store';
 import * as Dialog from '@radix-ui/react-dialog';
 import { UserLogsDialog } from './user-logs-dialog';
 import { SendMessageDialog } from './send-message-dialog';
@@ -39,6 +40,9 @@ interface Request {
 }
 
 export function UsersAdmin({ setError, setMessage }: Props) {
+  // Global settings
+  const { autoApproveUsers, setAutoApproveUsers, initializeSettings } = useSettingsStore();
+  
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,6 +61,9 @@ export function UsersAdmin({ setError, setMessage }: Props) {
   const [isWithdrawalDialogOpen, setIsWithdrawalDialogOpen] = useState(false);
 
   useEffect(() => {
+    // Initialize global settings
+    initializeSettings();
+    
     // Listen to users
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const usersList = snapshot.docs.map(doc => ({
@@ -131,10 +138,16 @@ export function UsersAdmin({ setError, setMessage }: Props) {
     try {
       const userRef = doc(db, 'users', userId);
       const userDoc = await getDoc(userRef);
+      
       if (!userDoc.exists()) {
-        throw new Error('User not found');
+        setError('User not found');
+        return;
       }
       
+      // Check if auto-approve is enabled and log it
+      if (autoApproveUsers) {
+        console.log('Auto-approve is enabled. This manual approval may not be necessary in the future.');
+      }
       const userData = userDoc.data();
       const batch = writeBatch(db);
       // Mark user as approved
@@ -441,6 +454,32 @@ export function UsersAdmin({ setError, setMessage }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* Global Settings */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex items-center justify-between py-2 border-b border-gray-100 mb-2">
+          <div>
+            <h3 className="font-medium">Auto-Approve New Users</h3>
+            <p className="text-sm text-gray-600">When enabled, new users will be automatically approved upon registration</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAutoApproveUsers(!autoApproveUsers)}
+            className="focus:outline-none"
+          >
+            {autoApproveUsers ? (
+              <ToggleRight className="h-8 w-8 text-green-500" />
+            ) : (
+              <ToggleLeft className="h-8 w-8 text-gray-400" />
+            )}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 italic">
+          {autoApproveUsers 
+            ? "New users are being automatically approved. No manual approval required." 
+            : "New users require manual approval before they can use the platform."}
+        </p>
+      </div>
+
       {/* Pending Requests */}
       {requests.length > 0 && (
         <div className="rounded-lg bg-white p-6 shadow-md">
