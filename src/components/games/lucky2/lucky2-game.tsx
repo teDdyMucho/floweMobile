@@ -241,7 +241,7 @@ export function Lucky2Game({ gameStatus, jackpot, setError, setMessage }: Props)
         <div className="rounded-md bg-blue-50 p-3 md:p-4">
           <h3 className="mb-2 font-semibold">Your Current Bet</h3>
           <div className="space-y-1 text-sm md:text-base">
-            <p>Numbers: {currentBet.numbers.join(', ')}</p>
+            <p>Numbers: {currentBet.numbers ? currentBet.numbers.join(', ') : 'N/A'}</p>
             <p>Amount: {currentBet.betAmount} points</p>
             <p>Status: {currentBet.result}</p>
             {currentBet.winnings > 0 && (
@@ -340,7 +340,7 @@ export function Lucky2Game({ gameStatus, jackpot, setError, setMessage }: Props)
                           {bet.placedAt.toLocaleTimeString()}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 md:px-6 md:py-4">
-                          {bet.numbers.join(', ')}
+                          {bet.numbers ? bet.numbers.join(', ') : 'N/A'}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 md:px-6 md:py-4">
                           {bet.betAmount}

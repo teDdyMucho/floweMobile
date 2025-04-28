@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/auth-store';
-import { collection, query, where, getDocs, doc, setDoc, runTransaction, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { generateReferralCode } from '@/lib/utils';
 import { AuthPanel } from '@/components/auth/auth-panel';
 import UserPanel from '@/components/user/user-panel';
 import { GamePanel } from '@/components/games/game-panel';
@@ -12,12 +9,27 @@ import { HomePanel } from '@/components/home/home-panel';
 import { ChatBubble } from '@/components/chat/chat-bubble';
 import { MessageNotification } from '@/components/notifications/message-notification';
 import { InstallPrompt } from '@/components/install-prompt';
+import { OfflineScreen } from '@/components/offline-screen';
 
 type ActivePanel = 'user' | 'home' | 'game' | 'admin' | null;
+
+// Clear all caches to ensure fresh content on page load
+const clearCachesOnLoad = async () => {
+  if ('caches' in window) {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(key => caches.delete(key)));
+      console.log('All caches cleared on page load');
+    } catch (error) {
+      console.error('Error clearing caches:', error);
+    }
+  }
+};
 
 function App() {
   const { user } = useAuthStore();
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   // Handle hash changes
   useEffect(() => {
@@ -38,12 +50,64 @@ function App() {
     return () => window.removeEventListener('hashchange', handleHash);
   }, [user?.isAdmin]);
 
+  // Clear cache on initial load
+  useEffect(() => {
+    clearCachesOnLoad();
+  }, []);
+
+  // Monitor network connectivity
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      // Clear cache and reload when coming back online to get fresh content
+      clearCachesOnLoad().then(() => window.location.reload());
+    };
+    const handleOffline = () => setIsOffline(true);
+    
+    // Check connection status immediately
+    setIsOffline(!navigator.onLine);
+    
+    // Add event listeners for online/offline events
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Periodically check connection to server
+    const checkServerConnection = async () => {
+      try {
+        // Try to fetch a small resource from your server with a cache-busting parameter
+        const response = await fetch(`/api/ping?t=${Date.now()}`, { 
+          method: 'HEAD',
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        
+        if (!response.ok) {
+          setIsOffline(true);
+        }
+      } catch (error) {
+        // If fetch fails, user is offline or server is down
+        setIsOffline(true);
+      }
+    };
+    
+    // Check connection every 30 seconds
+    const intervalId = setInterval(checkServerConnection, 30000);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(intervalId);
+    };
+  }, []);
+
   if (!user) {
     return <AuthPanel />;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <OfflineScreen isOffline={isOffline} />
+      
       <Header />
       
       <main className="container mx-auto px-4 py-4 md:py-8">

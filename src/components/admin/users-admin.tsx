@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, getDoc, getDocs, addDoc, writeBatch, increment, orderBy, deleteDoc, arrayUnion } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, getDoc, getDocs, addDoc, writeBatch, increment, orderBy, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { processReferralBonuses } from '@/services/referralService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Check, X, User, Users, CircleDollarSign, DollarSign, AlertCircle, Trash2, Ban, MessageSquare, Search, ToggleLeft, ToggleRight } from 'lucide-react';
@@ -148,74 +149,17 @@ export function UsersAdmin({ setError, setMessage }: Props) {
       if (autoApproveUsers) {
         console.log('Auto-approve is enabled. This manual approval may not be necessary in the future.');
       }
+      
       const userData = userDoc.data();
-      const batch = writeBatch(db);
-      // Mark user as approved
-      batch.update(userRef, { approved: true });
-
-      // Multi-level referral system:
-      // Bonus amounts for each level:
-      // Level 1: 100, Level 2: 5, Level 3: 5, Level 4: 10, Level 5: 20
-      const bonusLevels = [100, 5, 5, 10, 30];
-      // Define which field to update for each level: level 1 credits points, levels 2-5 credit cash.
-      const bonusGive = ['points', 'cash', 'cash', 'cash', 'cash'];
-      let currentReferralCode = userData.referralCodeFriend;
       
-      // Keep track of referrers who have already been rewarded to prevent duplicates
-      const processedReferrers = new Set();
+      // First, mark the user as approved
+      await updateDoc(userRef, { approved: true });
       
-      for (let level = 0; level < bonusLevels.length; level++) {
-        if (!currentReferralCode || currentReferralCode === 'Not set') break;
-        
-        const referrerQuery = query(
-          collection(db, 'users'),
-          where('referralCode', '==', currentReferralCode)
-        );
-        const referrerSnapshot = await getDocs(referrerQuery);
-        if (referrerSnapshot.empty) break;
-      
-        const referrerDoc = referrerSnapshot.docs[0];
-        const referrerId = referrerDoc.id;
-        
-        // Skip if this referrer has already been processed (prevents double rewards)
-        if (processedReferrers.has(referrerId)) {
-          console.log(`Skipping duplicate referrer: ${referrerId} at level ${level + 1}`);
-          break; // Exit the loop as we've hit a cycle in the referral chain
-        }
-        
-        // Mark this referrer as processed
-        processedReferrers.add(referrerId);
-        
-        const referrerData = referrerDoc.data();
-      
-        // Update the referrer's document:
-        // - Add the approved user's ID to their referrals array.
-        // - Credit bonus to the appropriate field (points or cash) for the current level.
-        batch.update(referrerDoc.ref, {
-          referrals: arrayUnion(userId),
-          [bonusGive[level]]: increment(bonusLevels[level])
-        });
-      
-        // Log the referral bonus as a transaction.
-        const transactionRef = doc(collection(db, 'transactions'));
-        batch.set(transactionRef, {
-          userId: referrerDoc.id,
-          username: referrerData.username,
-          amount: bonusLevels[level],
-          type: `referral_bonus_level_${level + 1}`,
-          description: `Referral bonus for level ${level + 1} awarded: ${bonusLevels[level]} ${bonusGive[level]}`,
-          timestamp: new Date(),
-          balanceAfter: {
-            points: (referrerData.points || 0) + (bonusGive[level] === 'points' ? bonusLevels[level] : 0),
-            cash: (referrerData.cash || 0) + (bonusGive[level] === 'cash' ? bonusLevels[level] : 0)
-          }
-        });
-        
-        // Move up the chain using the current referrer's referralCodeFriend.
-        currentReferralCode = referrerData.referralCodeFriend;
+      // Then process the referral bonuses using the shared service
+      if (userData.referralCodeFriend) {
+        await processReferralBonuses(userId, userData.referralCodeFriend);
       }
-
-      await batch.commit();
+      
       setMessage('User approved successfully');
     } catch (err) {
       setError('Failed to approve user');

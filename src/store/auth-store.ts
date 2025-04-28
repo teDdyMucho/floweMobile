@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { generateReferralCode } from '@/lib/utils';
+import { processReferralBonuses } from '@/services/referralService';
 import { useSettingsStore } from './settings-store';
 
 interface User {
@@ -215,10 +216,17 @@ export const useAuthStore = create<AuthState>()(
             const refSnapshot = await getDocs(refQuery);
             
             if (!refSnapshot.empty) {
-              // Store referrer info but don't award points yet
-              // Use type assertion to add these properties
-              (newUserData as any).referrerId = refSnapshot.docs[0].id;
-              (newUserData as any).referralPending = true;
+              // Store the referral code as referralCodeFriend
+              newUserData.referralCodeFriend = referralCode.toUpperCase();
+              
+              if (autoApproveUsers) {
+                // If auto-approve is enabled, we don't need to mark as pending
+                // The user will be approved immediately
+              } else {
+                // If manual approval is required, mark as pending
+                (newUserData as any).referralPending = true;
+                (newUserData as any).referrerId = refSnapshot.docs[0].id;
+              }
             } else {
               throw new Error("Invalid referral code");
             }
@@ -226,6 +234,18 @@ export const useAuthStore = create<AuthState>()(
 
           const userRef = doc(collection(db, "users"));
           await setDoc(userRef, newUserData);
+          
+          // If auto-approval is enabled and there's a referral code, process the referral bonuses
+          if (autoApproveUsers && referralCode) {
+            try {
+              await processReferralBonuses(userRef.id, referralCode.toUpperCase());
+              console.log('Auto-approved user referral bonuses processed successfully');
+            } catch (error) {
+              console.error('Error processing referral bonuses for auto-approved user:', error);
+              // We don't throw here to avoid failing the registration
+              // The user is still registered, but the referral bonuses might need manual processing
+            }
+          }
           
           set({ loading: false });
         } catch (error) {
