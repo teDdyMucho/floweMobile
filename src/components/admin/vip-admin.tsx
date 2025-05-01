@@ -399,50 +399,62 @@ export function VIPAdmin({ setError, setMessage }: Props) {
         </div>
       </div>
       {/* Point Transfer Requests */}
-      {transferRequests.length > 0 && (
+      {allowDirectTransfers ? (
         <div className="rounded-lg bg-white p-6 shadow-lg">
           <h2 className="mb-4 text-lg font-semibold flex items-center">
             <SendHorizonal className="h-5 w-5 mr-2 text-green-500" />
-            Pending Point Transfers
+            Direct Point Transfers Enabled
           </h2>
-          <div className="space-y-4">
-            {transferRequests.map((request) => (
-              <div key={request.id} className="flex items-center justify-between rounded-lg border bg-gray-50 p-4">
-                <div>
-                  <p className="font-medium">{request.username}</p>
-                  <p className="text-sm text-gray-600">
-                    Requesting to transfer {request.amount} points to {request.recipientUsername}
-                  </p>
-                  <div className="flex items-center mt-1">
-                    <p className="text-xs text-gray-500 mr-2">{request.timestamp.toLocaleString()}</p>
-                    {request.directTransfer && (
-                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
-                        Admin Bypass Enabled
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={() => handleTransferRequest(request, true)}
-                    disabled={isProcessingTransfer}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    onClick={() => handleTransferRequest(request, false)}
-                    disabled={isProcessingTransfer}
-                    variant="outline"
-                    className="border-red-500 text-red-600 hover:bg-red-50"
-                  >
-                    Decline
-                  </Button>
-                </div>
-              </div>
-            ))}
+          <div className="text-green-700 bg-green-50 border border-green-200 rounded-lg p-4">
+            Direct point transfers are currently enabled. Users can transfer points instantly without admin approval, and no pending transfer requests will appear.
           </div>
         </div>
+      ) : (
+        transferRequests.length > 0 && (
+          <div className="rounded-lg bg-white p-6 shadow-lg">
+            <h2 className="mb-4 text-lg font-semibold flex items-center">
+              <SendHorizonal className="h-5 w-5 mr-2 text-green-500" />
+              Pending Point Transfers
+            </h2>
+            <div className="space-y-4">
+              {transferRequests.map((request) => (
+                <div key={request.id} className="flex items-center justify-between rounded-lg border bg-gray-50 p-4">
+                  <div>
+                    <p className="font-medium">{request.username}</p>
+                    <p className="text-sm text-gray-600">
+                      Requesting to transfer {request.amount} points to {request.recipientUsername}
+                    </p>
+                    <div className="flex items-center mt-1">
+                      <p className="text-xs text-gray-500 mr-2">{request.timestamp.toLocaleString()}</p>
+                      {request.directTransfer && (
+                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
+                          Admin Bypass Enabled
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      onClick={() => handleTransferRequest(request, true)}
+                      disabled={isProcessingTransfer}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      onClick={() => handleTransferRequest(request, false)}
+                      disabled={isProcessingTransfer}
+                      variant="outline"
+                      className="border-red-500 text-red-600 hover:bg-red-50"
+                    >
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
       )}
 
       {/* VIP Upgrade Requests */}
