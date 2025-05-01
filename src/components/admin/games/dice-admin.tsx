@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import {
-  collection, query, where, onSnapshot, doc, updateDoc, addDoc, orderBy, writeBatch, getDocs
+  collection, query, where, onSnapshot, doc, updateDoc, addDoc, orderBy, writeBatch, getDocs, increment
 } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { DiceRound, DiceBet } from '@/components/games/dice-types';
@@ -125,17 +125,25 @@ export function DiceAdmin({ setError, setMessage }: { setError: (msg: string) =>
         if (color !== 'none' && payout > 0) {
           if (payoutType === 'fbt') {
             batch.update(doc(db, 'users', bet.userId), {
-              points: (bet.amount + payout), // add FBT winnings
+              points: increment(payout), // only add winnings, bet already deducted
             });
           }
           // For cash payout, you may want to trigger a manual cash payout process
         }
       });
       await batch.commit();
+      // Log round history to persistent collection for auditing and player history
+      await addDoc(collection(db, 'diceHistory'), {
+        roundId: round.id,
+        numberColors,
+        closedAt: new Date(),
+        bets: snap.docs.map(docSnap => docSnap.data()),
+      });
       setMessage('Round closed and bets resolved!');
       setNumberColors({ 1: 'none', 2: 'none', 3: 'none', 4: 'none', 5: 'none', 6: 'none' });
-    } catch {
+    } catch (err) {
       setError('Failed to resolve round.');
+      console.error('DiceAdmin closeRoundAndResolve error:', err);
     } finally {
       setIsDrawing(false);
     }
