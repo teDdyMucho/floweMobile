@@ -11,9 +11,10 @@ import { ProfitPanel } from './profit-panel';
 import { VIPAdmin } from './vip-admin';
 import { InvestmentsAdmin } from './investments-admin';
 import { UltraManualAdmin } from './games/ultra-manual-admin';
+import { DiceAdmin } from './games/dice-admin';
 import { AlertCircle, CheckCircle2, Dice1, Binary, Swords, Users, Receipt, TrendingUp, DollarSign, BarChart3, Network, Users as Horse, Crown, PiggyBank, Dices } from 'lucide-react';
 
-type AdminSection = 'lucky2' | 'bingo' | 'versus' | 'users' | 'transactions' | 'vip' | 'investments' | 'ultraManual';
+type AdminSection = 'lucky2' | 'bingo' | 'versus' | 'users' | 'transactions' | 'vip' | 'investments' | 'ultraManual' | 'dice';
 
 export function AdminPanel() {
   const { user } = useAuthStore();
@@ -89,6 +90,13 @@ export function AdminPanel() {
       icon: Dices,
       color: 'from-purple-500 to-pink-500',
       description: 'Process manual game bets'
+    },
+    {
+      id: 'dice',
+      label: 'Dice Game',
+      icon: Dice1,
+      color: 'from-green-500 to-blue-500',
+      description: 'Manage and process dice bets'
     }
   ] as const;
 
@@ -197,6 +205,9 @@ export function AdminPanel() {
         <div className="p-6">
           {activeSection === 'lucky2' && (
             <Lucky2Admin setError={setError} setMessage={setMessage} />
+          )}
+          {activeSection === 'dice' && (
+            <DiceAdmin setError={setError} setMessage={setMessage} />
           )}
           {activeSection === 'bingo' && (
             <BingoAdmin setError={setError} setMessage={setMessage} />

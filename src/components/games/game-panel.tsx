@@ -7,6 +7,7 @@ import { BingoGame } from './bingo/bingo-game';
 import { VersusGames } from './versus/versus-games';
 import { InvestmentsGame } from './investments/investments-game';
 import { UltraManualGame } from './ultra-manual/ultra-manual-game';
+import { DiceGame } from './dice-game';
 
 interface GameStatus {
   lucky2: boolean;
@@ -43,7 +44,7 @@ export function GamePanel() {
   });
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [selectedGame, setSelectedGame] = useState<'lucky2' | 'bingo' | 'versus' | 'investments' | 'ultraManual'>('lucky2');
+  const [selectedGame, setSelectedGame] = useState<'lucky2' | 'bingo' | 'versus' | 'investments' | 'ultraManual' | 'dice'>('lucky2');
 
   useEffect(() => {
     // Listen to Lucky2 game status
@@ -126,6 +127,13 @@ export function GamePanel() {
       icon: Dices,
       color: 'from-purple-500 via-pink-500 to-rose-500',
       description: 'Manual bet processing'
+    },
+    {
+      id: 'dice' as const,
+      name: 'Dice Game',
+      icon: Dice,
+      color: 'from-green-400 via-blue-400 to-indigo-400',
+      description: 'Pick a number and win big!'
     }
   ];
 
@@ -155,6 +163,8 @@ export function GamePanel() {
         return <InvestmentsGame setError={setError} setMessage={setMessage} />;
       case 'ultraManual':
         return <UltraManualGame setError={setError} setMessage={setMessage} />;
+      case 'dice':
+        return <DiceGame setError={setError} setMessage={setMessage} />;
       default:
         return null;
     }

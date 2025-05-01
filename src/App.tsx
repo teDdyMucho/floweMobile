@@ -10,6 +10,7 @@ import { ChatBubble } from '@/components/chat/chat-bubble';
 import { MessageNotification } from '@/components/notifications/message-notification';
 import { InstallPrompt } from '@/components/install-prompt';
 import { OfflineScreen } from '@/components/offline-screen';
+import DiceGameLink from '@/components/games/dice-game-link';
 
 type ActivePanel = 'user' | 'home' | 'game' | 'admin' | null;
 
@@ -27,6 +28,10 @@ const clearCachesOnLoad = async () => {
 };
 
 function App() {
+  // Quick path-based override for /dice-link
+  if (typeof window !== 'undefined' && window.location.pathname === '/dice-link') {
+    return <DiceGameLink />;
+  }
   const { user } = useAuthStore();
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
